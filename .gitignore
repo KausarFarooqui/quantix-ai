@@ -1,0 +1,33 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml
+
+# Python (apps/api)
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+coverage.xml
+htmlcov/
+.coverage
+
+# Node (apps/web)
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
