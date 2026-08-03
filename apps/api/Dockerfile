@@ -15,13 +15,27 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 
+# Two-pass install: the first pass (editable, before `src` exists) just
+# resolves and caches third-party dependencies from pyproject.toml alone,
+# so that layer survives source-only changes. The second pass — after
+# `COPY src` — reinstalls the local package for real (`--no-deps`, deps are
+# already in place), replacing the editable install with an actual
+# self-contained copy in site-packages.
+#
+# The editable install from pass one must NOT be what ships: `pip/uv
+# install -e .` doesn't copy files, it points Python at this build
+# directory's absolute path (`/build/src`). The runtime stage below only
+# copies `/opt/venv`, not `/build` — so an editable install here becomes a
+# dangling reference once `/build` no longer exists, and anything that
+# imports `quantix_api` at runtime (alembic, uvicorn) fails with
+# `ModuleNotFoundError: No module named 'quantix_api'`.
 COPY pyproject.toml README.md ./
 RUN uv venv /opt/venv --python 3.13 && \
     . /opt/venv/bin/activate && \
-    uv pip install --no-cache -e ".[dev]" || uv pip install --no-cache .
+    uv pip install --no-cache -e ".[dev]" || uv pip install --no-cache -e .
 
 COPY src ./src
-RUN . /opt/venv/bin/activate && uv pip install --no-cache -e .
+RUN . /opt/venv/bin/activate && uv pip install --no-cache --no-deps .
 
 # ---- Runtime: minimal image, no build toolchain ----
 FROM python:3.13-slim AS runtime
