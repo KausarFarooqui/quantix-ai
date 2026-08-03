@@ -74,4 +74,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # own PORT and expect the container to listen on it — a hardcoded port
 # works in docker-compose (nothing sets PORT there, so it falls back to
 # 8000) but silently breaks on those platforms otherwise.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn quantix_api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"]
+#
+# Worker count defaults to 1 rather than a hardcoded 4: a hardcoded 4 OOM
+# killed the free-tier Render instance (512MB RAM) almost immediately —
+# four worker processes each loading FastAPI, SQLAlchemy, LangGraph, and
+# the Anthropic SDK is too much for that budget. Render's own boot log
+# already computes a sane value in $WEB_CONCURRENCY ("based on available
+# CPUs in the instance"); this reads that when set and only falls back to
+# 1 where it isn't (e.g. plain `docker run`). Raise it explicitly via the
+# WEB_CONCURRENCY env var on a bigger instance/plan if throughput matters
+# more than memory headroom.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn quantix_api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]
