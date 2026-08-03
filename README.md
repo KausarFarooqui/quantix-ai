@@ -113,6 +113,15 @@ npm run lint
 CI runs both suites plus a Docker build sanity check on every push/PR — see
 [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Deployment
+
+[docs/DEPLOY.md](docs/DEPLOY.md) covers deploying to Render via the
+[`render.yaml`](render.yaml) Blueprint at the repo root — one file
+provisions Postgres, the API, and the frontend together. Both Dockerfiles
+are platform-agnostic (bind to `$PORT`, run migrations on start), so the
+same images work on Railway, Fly.io, or a plain VM with a different
+front-door config.
+
 ## Core principles
 
 Clean Architecture, Domain-Driven Design, SOLID, Repository Pattern,

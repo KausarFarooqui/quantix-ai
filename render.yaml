@@ -1,0 +1,122 @@
+# Render Blueprint — provisions the whole deployable stack (Postgres, the
+# FastAPI backend, the Next.js frontend) from one file.
+#
+# Redis/Celery/Qdrant are deliberately NOT included here: nothing shipped so
+# far (milestones 1-7) requires them at runtime — GET /health/ready only
+# checks Postgres, and the async dataset-sync/vector-search paths those
+# services would back aren't wired into any live feature yet (see
+# docs/DEPLOY.md). Add them here if/when that changes.
+#
+# Usage: Render dashboard -> New -> Blueprint -> select this repo. Render
+# reads this file and provisions all three resources in one go, prompting
+# for every `sync: false` value below.
+#
+# All three resources share a region so the API can reach Postgres over
+# Render's private network (faster, no bandwidth cost) instead of the
+# public internet.
+
+databases:
+  - name: quantix-postgres
+    plan: free
+    region: oregon
+    databaseName: quantix
+    user: quantix
+
+services:
+  - type: web
+    name: quantix-api
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      # Signs JWTs — generated once at first provision, never committed.
+      - key: SECRET_KEY
+        generateValue: true
+      # Encrypts data-source credentials (e.g. DB passwords) at rest —
+      # deliberately separate from SECRET_KEY so the two can rotate
+      # independently. Defaults to a dev-only placeholder if unset; this
+      # generates a real one for production.
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: '["https://quantix-web.onrender.com"]'
+      - key: FRONTEND_URL
+        value: https://quantix-web.onrender.com
+      - key: API_PUBLIC_URL
+        value: https://quantix-api.onrender.com
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: quantix-postgres
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: quantix-postgres
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: quantix-postgres
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: quantix-postgres
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: quantix-postgres
+          property: database
+      # OAuth is optional — email/password auth works with these unset.
+      # Fill in via the dashboard (Environment tab) if/when you register
+      # OAuth apps with Google/GitHub/Microsoft.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+
+  - type: web
+    name: quantix-web
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: ./apps/web
+    healthCheckPath: /
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://quantix-api.onrender.com/api/v1
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://quantix-web.onrender.com
+      - key: NEXTAUTH_URL
+        value: https://quantix-web.onrender.com
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false

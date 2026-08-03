@@ -46,6 +46,18 @@ USER quantix
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -fsS http://localhost:8000/api/v1/health/live || exit 1
+    CMD curl -fsS "http://localhost:${PORT:-8000}/api/v1/health/live" || exit 1
 
-CMD ["uvicorn", "quantix_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Runs migrations on every container start rather than relying on a
+# platform-specific pre-deploy hook (e.g. Render's `preDeployCommand`,
+# which is paid-plan-only — see docs/DEPLOY.md). `alembic upgrade head` is
+# a no-op once the database is already current, so this is safe on every
+# restart, not just the first. `exec` hands off PID 1 to uvicorn so it
+# receives SIGTERM directly for a clean shutdown.
+#
+# Binds to $PORT rather than a hardcoded 8000: hosting platforms that run
+# arbitrary Dockerfiles (Render, Railway, Fly.io, Cloud Run) inject their
+# own PORT and expect the container to listen on it — a hardcoded port
+# works in docker-compose (nothing sets PORT there, so it falls back to
+# 8000) but silently breaks on those platforms otherwise.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn quantix_api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"]
