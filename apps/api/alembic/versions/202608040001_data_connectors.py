@@ -18,6 +18,10 @@ down_revision: str | None = "202608030001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+# create_type=False on the TYPE object (not as a sa.Column kwarg — that's
+# silently ignored, see 202608030001's comment) is what stops
+# op.create_table's before_create DDL event from re-issuing CREATE TYPE
+# for a type the checkfirst loop in upgrade() already created.
 source_type_enum = postgresql.ENUM(
     "csv",
     "excel",
@@ -31,10 +35,13 @@ source_type_enum = postgresql.ENUM(
     "bigquery",
     "google_sheets",
     name="source_type",
+    create_type=False,
 )
-data_source_status_enum = postgresql.ENUM("pending", "active", "error", name="data_source_status")
+data_source_status_enum = postgresql.ENUM(
+    "pending", "active", "error", name="data_source_status", create_type=False
+)
 dataset_status_enum = postgresql.ENUM(
-    "pending", "processing", "ready", "failed", name="dataset_status"
+    "pending", "processing", "ready", "failed", name="dataset_status", create_type=False
 )
 
 _ENUMS = (source_type_enum, data_source_status_enum, dataset_status_enum)
@@ -75,18 +82,12 @@ def upgrade() -> None:
         ),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("source_type", source_type_enum, nullable=False, create_type=False),
+        sa.Column("source_type", source_type_enum, nullable=False),
         sa.Column(
             "config", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"
         ),
         sa.Column("encrypted_secrets", sa.Text(), nullable=True),
-        sa.Column(
-            "status",
-            data_source_status_enum,
-            nullable=False,
-            server_default="pending",
-            create_type=False,
-        ),
+        sa.Column("status", data_source_status_enum, nullable=False, server_default="pending"),
         sa.Column("last_tested_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_test_error", sa.Text(), nullable=True),
         sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=True),
@@ -125,9 +126,7 @@ def upgrade() -> None:
         sa.Column("row_count", sa.BigInteger(), nullable=True),
         sa.Column("size_bytes", sa.BigInteger(), nullable=True),
         sa.Column("storage_uri", sa.String(1000), nullable=True),
-        sa.Column(
-            "status", dataset_status_enum, nullable=False, server_default="pending", create_type=False
-        ),
+        sa.Column("status", dataset_status_enum, nullable=False, server_default="pending"),
         sa.Column("status_message", sa.Text(), nullable=True),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(

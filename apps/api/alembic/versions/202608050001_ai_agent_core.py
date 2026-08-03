@@ -18,8 +18,16 @@ down_revision: str | None = "202608040001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-conversation_status_enum = postgresql.ENUM("active", "archived", name="conversation_status")
-message_role_enum = postgresql.ENUM("user", "assistant", "system", name="message_role")
+# create_type=False on the TYPE object (not as a sa.Column kwarg — that's
+# silently ignored, see 202608030001's comment) is what stops
+# op.create_table's before_create DDL event from re-issuing CREATE TYPE
+# for a type the checkfirst loop in upgrade() already created.
+conversation_status_enum = postgresql.ENUM(
+    "active", "archived", name="conversation_status", create_type=False
+)
+message_role_enum = postgresql.ENUM(
+    "user", "assistant", "system", name="message_role", create_type=False
+)
 agent_type_enum = postgresql.ENUM(
     "supervisor",
     "data_ingestion",
@@ -35,8 +43,11 @@ agent_type_enum = postgresql.ENUM(
     "dashboard_builder",
     "explainable_ai",
     name="agent_type",
+    create_type=False,
 )
-agent_run_status_enum = postgresql.ENUM("running", "succeeded", "failed", name="agent_run_status")
+agent_run_status_enum = postgresql.ENUM(
+    "running", "succeeded", "failed", name="agent_run_status", create_type=False
+)
 
 _ENUMS = (conversation_status_enum, message_role_enum, agent_type_enum, agent_run_status_enum)
 
@@ -72,13 +83,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column("dataset_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "status",
-            conversation_status_enum,
-            nullable=False,
-            server_default="active",
-            create_type=False,
-        ),
+        sa.Column("status", conversation_status_enum, nullable=False, server_default="active"),
         sa.ForeignKeyConstraint(
             ["dataset_id"],
             ["datasets.id"],
@@ -109,9 +114,9 @@ def upgrade() -> None:
         ),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("conversation_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("role", message_role_enum, nullable=False, create_type=False),
+        sa.Column("role", message_role_enum, nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("agent_type", agent_type_enum, nullable=True, create_type=False),
+        sa.Column("agent_type", agent_type_enum, nullable=True),
         sa.ForeignKeyConstraint(
             ["conversation_id"],
             ["conversations.id"],
@@ -137,10 +142,8 @@ def upgrade() -> None:
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("conversation_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("message_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("agent_type", agent_type_enum, nullable=False, create_type=False),
-        sa.Column(
-            "status", agent_run_status_enum, nullable=False, server_default="running", create_type=False
-        ),
+        sa.Column("agent_type", agent_type_enum, nullable=False),
+        sa.Column("status", agent_run_status_enum, nullable=False, server_default="running"),
         sa.Column("input_summary", sa.Text(), nullable=True),
         sa.Column("output_summary", sa.Text(), nullable=True),
         sa.Column(

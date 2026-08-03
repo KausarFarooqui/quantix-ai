@@ -18,16 +18,27 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# Postgres ENUM types are created explicitly (checkfirst) and referenced
-# in columns with create_type=False, so op.create_table doesn't attempt a
-# redundant (and error-prone) implicit CREATE TYPE.
-tenant_plan_enum = postgresql.ENUM("free", "pro", "enterprise", name="tenant_plan")
-tenant_status_enum = postgresql.ENUM(
-    "active", "suspended", "pending_deletion", name="tenant_status"
+# Postgres ENUM types are created explicitly, once, via the checkfirst
+# loop in upgrade() below. `create_type=False` here (on the TYPE object
+# itself, not as a sa.Column kwarg — that's the bug this comment used to
+# describe and get wrong) is what actually stops op.create_table from
+# *also* auto-issuing a redundant CREATE TYPE via its before_create DDL
+# event for every column that references one of these enums. Passing
+# create_type=False to sa.Column(...) instead (as this file used to do)
+# is silently ignored — Column has no such parameter — so the automatic
+# CREATE TYPE fires anyway and collides with the explicit one below,
+# exactly the failure this now prevents.
+tenant_plan_enum = postgresql.ENUM(
+    "free", "pro", "enterprise", name="tenant_plan", create_type=False
 )
-user_role_enum = postgresql.ENUM("owner", "admin", "analyst", "viewer", name="user_role")
+tenant_status_enum = postgresql.ENUM(
+    "active", "suspended", "pending_deletion", name="tenant_status", create_type=False
+)
+user_role_enum = postgresql.ENUM(
+    "owner", "admin", "analyst", "viewer", name="user_role", create_type=False
+)
 oauth_provider_name_enum = postgresql.ENUM(
-    "google", "github", "microsoft", name="oauth_provider_name"
+    "google", "github", "microsoft", name="oauth_provider_name", create_type=False
 )
 audit_action_enum = postgresql.ENUM(
     "tenant.created",
@@ -41,6 +52,7 @@ audit_action_enum = postgresql.ENUM(
     "token.reuse_detected",
     "user.role_changed",
     name="audit_action",
+    create_type=False,
 )
 
 _ENUMS = (
@@ -70,16 +82,8 @@ def upgrade() -> None:
         ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("slug", sa.String(63), nullable=False),
-        sa.Column(
-            "plan", tenant_plan_enum, nullable=False, server_default="free", create_type=False
-        ),
-        sa.Column(
-            "status",
-            tenant_status_enum,
-            nullable=False,
-            server_default="active",
-            create_type=False,
-        ),
+        sa.Column("plan", tenant_plan_enum, nullable=False, server_default="free"),
+        sa.Column("status", tenant_status_enum, nullable=False, server_default="active"),
         sa.PrimaryKeyConstraint("id", name="pk_tenants"),
     )
     op.create_index("ix_tenants_slug", "tenants", ["slug"], unique=True)
@@ -99,7 +103,7 @@ def upgrade() -> None:
         sa.Column("email", sa.String(320), nullable=False),
         sa.Column("hashed_password", sa.String(255), nullable=True),
         sa.Column("full_name", sa.String(255), nullable=False),
-        sa.Column("role", user_role_enum, nullable=False, server_default="viewer", create_type=False),
+        sa.Column("role", user_role_enum, nullable=False, server_default="viewer"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("is_email_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.ForeignKeyConstraint(
@@ -155,9 +159,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "provider", oauth_provider_name_enum, nullable=False, create_type=False
-        ),
+        sa.Column("provider", oauth_provider_name_enum, nullable=False),
         sa.Column("provider_user_id", sa.String(255), nullable=False),
         sa.Column("email_at_provider", sa.String(320), nullable=False),
         sa.ForeignKeyConstraint(
@@ -183,7 +185,7 @@ def upgrade() -> None:
         ),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("action", audit_action_enum, nullable=False, create_type=False),
+        sa.Column("action", audit_action_enum, nullable=False),
         sa.Column("resource_type", sa.String(100), nullable=True),
         sa.Column("resource_id", sa.String(255), nullable=True),
         sa.Column("ip_address", sa.String(45), nullable=True),
