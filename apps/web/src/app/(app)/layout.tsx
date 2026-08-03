@@ -2,13 +2,19 @@
 
 import * as React from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/features/auth/hooks";
 import { useAuthStore } from "@/stores/auth-store";
 
-const NAV_ITEMS = [
+// Typed as `Route` (not inferred as plain `string`) so each entry is
+// checked against Next's `typedRoutes` route union at this declaration —
+// `next build` runs a stricter type check than `tsc --noEmit` alone (it
+// validates `Link href`s against generated route types), which a widened
+// `string` fails even though plain `tsc --noEmit` doesn't catch it.
+const NAV_ITEMS: { href: Route; label: string }[] = [
   { href: "/home", label: "Home" },
   { href: "/data-sources", label: "Data sources" },
   { href: "/datasets", label: "Datasets" },

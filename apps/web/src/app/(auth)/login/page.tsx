@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -30,11 +31,16 @@ export default function LoginPage() {
   // boundary in the App Router; reading it in an effect avoids that for
   // one query param this page only needs after a submit, never on first
   // paint. (`app/(app)/layout.tsx`'s auth guard is what sets `next`.)
-  const [redirectTo, setRedirectTo] = React.useState("/home");
+  const [redirectTo, setRedirectTo] = React.useState<Route>("/home");
   React.useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
-    if (next) {
-      setRedirectTo(next);
+    // Only accept a same-origin path (a single leading "/", not "//host/…"
+    // which browsers treat as protocol-relative to another origin) — this
+    // value is attacker-controllable via the query string and ends up in
+    // `router.push()`. The `as Route` cast is otherwise safe here because
+    // of that same-origin check, not despite it.
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      setRedirectTo(next as Route);
     }
   }, []);
 
