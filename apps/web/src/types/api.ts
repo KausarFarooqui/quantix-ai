@@ -59,12 +59,6 @@ export interface UserPublic {
   is_email_verified: boolean;
 }
 
-export interface OAuthAuthorizeResponse {
-  authorization_url: string;
-}
-
-export type OAuthProvider = "google" | "github" | "microsoft";
-
 // --- Data sources & datasets (mirrors .../schemas/connectors.py and
 // domain/entities/{data_source,dataset}.py) ---
 

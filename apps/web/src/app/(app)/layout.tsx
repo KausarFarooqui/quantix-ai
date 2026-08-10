@@ -3,10 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { useLogout } from "@/features/auth/hooks";
+import { useDemoLogin, useLogout } from "@/features/auth/hooks";
 import { useAuthStore } from "@/stores/auth-store";
 
 // Typed as `Route` (not inferred as plain `string`) so each entry is
@@ -22,33 +22,43 @@ const NAV_ITEMS: { href: Route; label: string }[] = [
 ];
 
 /**
- * Shell for every authenticated route. Auth is enforced here, client-side,
- * rather than in Next.js middleware — the session lives in `localStorage`
- * via `useAuthStore` (see that file's docstring for why), and middleware
- * runs on the server/edge where `localStorage` doesn't exist. The guard
- * waits for `hasHydrated` before deciding to redirect, so an
- * already-logged-in user doesn't get bounced to `/login` for one render
- * on every page load while the persisted store is still reading back from
- * disk.
+ * Shell for every route in the app. There's no login/signup UI (see
+ * ADR-0008) — instead of redirecting an unauthenticated visitor to
+ * `/login`, this shell silently authenticates them into a shared demo
+ * workspace via `useDemoLogin` (`POST /auth/demo-login`) and only renders
+ * the app once that session exists. The backend's real auth/multi-tenancy
+ * is untouched; this just drives one specific, intentionally-public
+ * account programmatically instead of through a form.
+ *
+ * The bootstrap waits for `hasHydrated` first so an already-hydrated
+ * session from a previous visit isn't discarded and re-requested on every
+ * page load while the persisted store is still reading back from disk.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
+  const demoLogin = useDemoLogin();
 
   React.useEffect(() => {
-    if (hasHydrated && !accessToken) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (hasHydrated && !accessToken && !demoLogin.isPending && !demoLogin.isError) {
+      demoLogin.mutate();
     }
-  }, [hasHydrated, accessToken, pathname, router]);
+    // demoLogin is intentionally omitted: it's a fresh mutation object each
+    // render, so depending on it would re-fire this effect every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated, accessToken]);
 
   if (!hasHydrated || !accessToken) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <main className="flex min-h-screen items-center justify-center px-4 text-center">
+        <p className="text-sm text-muted-foreground">
+          {demoLogin.isError
+            ? "Couldn't connect to Quantix. Check that the API is running, then refresh."
+            : "Loading…"}
+        </p>
       </main>
     );
   }

@@ -1,7 +1,7 @@
-"""End-to-end API tests for the auth endpoints — register, login, refresh,
-logout, and /me — against an in-memory SQLite database wired in via a
-``get_db_session`` dependency override (the real Postgres connection is
-never touched).
+"""End-to-end API tests for the auth endpoints — register, login,
+demo-login, refresh, logout, and /me — against an in-memory SQLite
+database wired in via a ``get_db_session`` dependency override (the real
+Postgres connection is never touched).
 
 Uses ``httpx.AsyncClient`` over an ``ASGITransport`` rather than Starlette's
 synchronous ``TestClient``: everything (schema creation, HTTP calls, and
@@ -156,6 +156,53 @@ class TestLoginEndpoint:
         )
 
         assert response.status_code == 401
+
+
+class TestDemoLoginEndpoint:
+    """There's no login/signup UI (ADR-0008) — `/auth/demo-login` is the
+    app's actual entry point, so it gets the same end-to-end coverage as
+    `/auth/register` and `/auth/login` above, not just the use case's unit
+    tests.
+    """
+
+    async def test_returns_usable_tokens_with_no_body(self, client: AsyncClient) -> None:
+        response = await client.post("/api/v1/auth/demo-login")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["access_token"]
+        assert body["refresh_token"]
+        assert body["token_type"] == "bearer"
+
+    async def test_the_returned_token_resolves_to_the_demo_user_via_me(
+        self, client: AsyncClient
+    ) -> None:
+        login_response = await client.post("/api/v1/auth/demo-login")
+        access_token = login_response.json()["access_token"]
+
+        response = await client.get(
+            "/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["email"] == "demo@quantix.local"
+        assert response.json()["role"] == "owner"
+
+    async def test_repeated_calls_reuse_the_same_account(self, client: AsyncClient) -> None:
+        first = await client.post("/api/v1/auth/demo-login")
+        second = await client.post("/api/v1/auth/demo-login")
+
+        first_user = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {first.json()['access_token']}"},
+        )
+        second_user = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {second.json()['access_token']}"},
+        )
+
+        assert first_user.json()["id"] == second_user.json()["id"]
+        assert first_user.json()["tenant_id"] == second_user.json()["tenant_id"]
 
 
 class TestRefreshAndLogout:

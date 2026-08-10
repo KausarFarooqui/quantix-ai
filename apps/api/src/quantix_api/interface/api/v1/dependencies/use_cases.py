@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from quantix_api.application.use_cases.demo_login import DemoLoginUseCase
 from quantix_api.application.use_cases.login_user import LoginUserUseCase
 from quantix_api.application.use_cases.logout_user import LogoutUserUseCase
 from quantix_api.application.use_cases.oauth_login import OAuthLoginUseCase
@@ -110,8 +111,29 @@ def get_oauth_login_use_case(
     )
 
 
+def get_demo_login_use_case(
+    tenant_repo: TenantRepo,
+    user_repo: UserRepo,
+    refresh_token_repo: RefreshTokenRepo,
+    password_hasher: PasswordHasherDep,
+    token_service: TokenServiceDep,
+    audit_logger: AuditLoggerDep,
+) -> DemoLoginUseCase:
+    return DemoLoginUseCase(
+        tenant_repo=tenant_repo,
+        user_repo=user_repo,
+        refresh_token_repo=refresh_token_repo,
+        password_hasher=password_hasher,
+        token_service=token_service,
+        audit_logger=audit_logger,
+    )
+
+
 RegisterUseCaseDep = Annotated[RegisterUserUseCase, Depends(get_register_use_case)]
 LoginUseCaseDep = Annotated[LoginUserUseCase, Depends(get_login_use_case)]
 RefreshUseCaseDep = Annotated[RefreshAccessTokenUseCase, Depends(get_refresh_use_case)]
 LogoutUseCaseDep = Annotated[LogoutUserUseCase, Depends(get_logout_use_case)]
 OAuthLoginUseCaseDep = Annotated[OAuthLoginUseCase, Depends(get_oauth_login_use_case)]
+# See application/use_cases/demo_login.py's module docstring — this is the
+# app's permanent auth-bootstrap mechanism, not a temporary dev-only shim.
+DemoLoginUseCaseDep = Annotated[DemoLoginUseCase, Depends(get_demo_login_use_case)]

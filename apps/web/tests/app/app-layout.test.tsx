@@ -5,27 +5,47 @@ import AppLayout from "@/app/(app)/layout";
 import { useAuthStore } from "@/stores/auth-store";
 import { renderWithQueryClient } from "../test-utils";
 
-const replace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace }),
   usePathname: () => "/home",
 }));
 
 vi.mock("@/features/auth/api", () => ({
   authApi: {
     logout: vi.fn().mockResolvedValue(undefined),
+    demoLogin: vi.fn(),
+    getCurrentUser: vi.fn(),
   },
 }));
+
+import { authApi } from "@/features/auth/api";
+import type { TokenResponse, UserPublic } from "@/types/api";
+
+const demoUser: UserPublic = {
+  id: "u1",
+  tenant_id: "t1",
+  email: "demo@quantix.local",
+  full_name: "Demo User",
+  role: "owner",
+  is_active: true,
+  is_email_verified: true,
+};
+
+const demoTokens: TokenResponse = {
+  access_token: "tok",
+  refresh_token: "refresh",
+  token_type: "bearer",
+  expires_in: 3600,
+};
 
 const initialAuthState = useAuthStore.getState();
 
 describe("AppLayout", () => {
   beforeEach(() => {
-    replace.mockClear();
+    vi.clearAllMocks();
     useAuthStore.setState(initialAuthState, true);
   });
 
-  it("shows a loading state and does not redirect before the store has hydrated", () => {
+  it("shows a loading state and does not attempt demo-login before the store has hydrated", () => {
     // Zustand's `persist` rehydration from localStorage typically finishes
     // before this test body even runs (it's not tied to React's render
     // cycle), so `hasHydrated` can't be relied on to still be `false` here
@@ -41,10 +61,12 @@ describe("AppLayout", () => {
 
     expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByText("Protected content")).not.toBeInTheDocument();
-    expect(replace).not.toHaveBeenCalled();
+    expect(authApi.demoLogin).not.toHaveBeenCalled();
   });
 
-  it("redirects to /login once hydrated with no access token", async () => {
+  it("silently bootstraps the demo session once hydrated with no access token", async () => {
+    vi.mocked(authApi.demoLogin).mockResolvedValueOnce(demoTokens);
+    vi.mocked(authApi.getCurrentUser).mockResolvedValueOnce(demoUser);
     useAuthStore.setState({ hasHydrated: true, accessToken: null });
 
     renderWithQueryClient(
@@ -53,23 +75,35 @@ describe("AppLayout", () => {
       </AppLayout>,
     );
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?next=%2Fhome"));
+    await waitFor(() => expect(screen.getByText("Protected content")).toBeInTheDocument());
+    expect(authApi.demoLogin).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().user).toEqual(demoUser);
+  });
+
+  it("shows a connection error if demo-login fails, instead of a dead-end /login redirect", async () => {
+    vi.mocked(authApi.demoLogin).mockRejectedValue(new Error("Failed to fetch"));
+    useAuthStore.setState({ hasHydrated: true, accessToken: null });
+
+    renderWithQueryClient(
+      <AppLayout>
+        <p>Protected content</p>
+      </AppLayout>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/Couldn't connect to Quantix/)).toBeInTheDocument(),
+    );
     expect(screen.queryByText("Protected content")).not.toBeInTheDocument();
+    // One failed attempt shouldn't loop retrying — `demoLogin.isError` gates
+    // the effect off until something (e.g. a manual refresh) resets it.
+    expect(authApi.demoLogin).toHaveBeenCalledTimes(1);
   });
 
   it("renders the shell and children once authenticated", () => {
     useAuthStore.setState({
       hasHydrated: true,
       accessToken: "token",
-      user: {
-        id: "u1",
-        tenant_id: "t1",
-        email: "a@example.com",
-        full_name: "Ada Lovelace",
-        role: "owner",
-        is_active: true,
-        is_email_verified: true,
-      },
+      user: demoUser,
     });
 
     renderWithQueryClient(
@@ -79,8 +113,7 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByText("Protected content")).toBeInTheDocument();
-    expect(screen.getByText(/Ada Lovelace/)).toBeInTheDocument();
+    expect(screen.getByText(/Demo User/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
-    expect(replace).not.toHaveBeenCalled();
   });
 });

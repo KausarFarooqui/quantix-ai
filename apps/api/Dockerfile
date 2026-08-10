@@ -56,6 +56,15 @@ COPY --chown=quantix:quantix src ./src
 COPY --chown=quantix:quantix alembic ./alembic
 COPY --chown=quantix:quantix alembic.ini ./
 
+# LocalFileStorage creates these at runtime (settings.file_storage_dir /
+# dataset_storage_dir default to ./data/uploads and ./data/datasets). /app
+# itself is owned by root (only the COPY targets above were chowned), so
+# without this the non-root `quantix` user can't mkdir a new top-level
+# directory under it and every upload/register-adjacent request that
+# touches storage 500s with PermissionError: [Errno 13] Permission denied.
+RUN mkdir -p /app/data/uploads /app/data/datasets && \
+    chown -R quantix:quantix /app/data
+
 USER quantix
 EXPOSE 8000
 

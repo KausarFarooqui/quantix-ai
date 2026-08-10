@@ -7,6 +7,7 @@ from fastapi import APIRouter, status
 from quantix_api.application.dto.auth import AuthTokens, LoginInput, RegisterInput
 from quantix_api.interface.api.v1.dependencies.auth import ClientIp, CurrentUser
 from quantix_api.interface.api.v1.dependencies.use_cases import (
+    DemoLoginUseCaseDep,
     LoginUseCaseDep,
     LogoutUseCaseDep,
     RefreshUseCaseDep,
@@ -63,6 +64,24 @@ async def login(body: LoginRequest, use_case: LoginUseCaseDep, ip_address: Clien
             ip_address=ip_address,
         )
     )
+    return _to_token_response(result.tokens)
+
+
+@router.post(
+    "/demo-login",
+    response_model=TokenResponse,
+    summary="Bootstrap a session for the shared demo workspace — no credentials required",
+)
+async def demo_login(use_case: DemoLoginUseCaseDep) -> TokenResponse:
+    """Get-or-creates the fixed demo tenant/user and returns a real token
+    pair with no password check. This is the app's only auth entry point
+    (see ADR-0008) — there's no login/signup UI, so the frontend calls
+    this instead. Intentionally has no environment guard: it must work in
+    every deployment, including production, or nothing can get past the
+    app shell. See demo_login.py's module docstring for why that's an
+    acceptable trade-off for this specific, intentionally-shared account.
+    """
+    result = await use_case.execute()
     return _to_token_response(result.tokens)
 
 

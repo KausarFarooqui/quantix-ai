@@ -20,7 +20,7 @@ This repository is being built incrementally, milestone by milestone. See
 | 5 | Frontend authentication & app shell | ✅ Done |
 | 6 | Frontend data source & dataset management UI | ✅ Done |
 | 7 | Frontend chat interface | ✅ Done |
-| 8+ | ML pipelines, reporting, dashboards, remaining agents | ⬜ Not started |
+| 8+ | ML pipelines, reporting, dashboards, remaining agents | 🚧 In progress |
 
 Milestone 2 shipped email/password auth, Google/GitHub/Microsoft OAuth,
 JWT + revocable refresh tokens, RBAC, and audit logging on the backend —
@@ -31,7 +31,12 @@ design and known follow-ups (invitations, OAuth account linking, a
 Milestone 5 gave the frontend its first real pages: `/login`, `/register`,
 the OAuth callback, and a protected app shell — see
 [ADR-0005](docs/adr/0005-frontend-auth-and-session.md) for the session
-storage and route-protection design.
+storage and route-protection design. That login/register UI was later
+removed in favor of a permanent `POST /auth/demo-login` bootstrap, so
+every route is reachable with zero setup, in every environment — see
+[ADR-0008](docs/adr/0008-demo-session-bootstrap.md). The backend's real
+auth/multi-tenancy (Milestone 2) is unchanged; only the frontend's visible
+auth surface went away.
 
 Milestone 6 shipped `/data-sources` (add/test/discover/delete a live
 connection) and `/datasets` (upload a file, pull a table from a data
