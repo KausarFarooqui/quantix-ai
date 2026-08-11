@@ -112,9 +112,12 @@ _register(
         routing_description="Projects future values of a numeric column forward in time — use for "
         "'predict', 'forecast', 'what will X be next quarter' questions.",
         system_prompt=f"{_COMMON_GUIDANCE}\n\nYour specialty is forecasting: identify the numeric "
-        "column and time ordering with get_dataset_schema/query_dataset, then use forecast_series "
-        "to project it forward. Always state the method (linear trend) and that it assumes the "
-        "recent trend continues — don't overstate confidence.",
+        "column (and, if the row order isn't already chronological, a time column to sort by) "
+        "with get_dataset_schema/query_dataset, then use forecast_series to project it forward "
+        "and persist the result. State the method the tool actually used (it varies — Holt-"
+        "Winters with a real prediction interval for series with enough history, a simpler "
+        "linear-trend fallback for short ones) and its interval; don't overstate confidence "
+        "beyond what that interval says.",
     )
 )
 

@@ -43,6 +43,7 @@ from quantix_api.domain.exceptions.connectors import (
     UnsupportedFileFormatError,
     UnsupportedSourceTypeError,
 )
+from quantix_api.domain.exceptions.forecasting import ForecastingError
 
 logger = get_logger(__name__)
 
@@ -69,6 +70,7 @@ _STATUS_MAP: dict[type[DomainError], int] = {
     LLMProviderError: status.HTTP_502_BAD_GATEWAY,
     AgentIterationLimitExceededError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     AgentError: status.HTTP_502_BAD_GATEWAY,
+    ForecastingError: status.HTTP_400_BAD_REQUEST,
 }
 
 

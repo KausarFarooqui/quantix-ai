@@ -78,6 +78,7 @@ class TestSendMessageUseCase:
             cipher=None,
             sync_dataset_use_case=None,
             discover_use_case=None,
+            generate_forecast_use_case=None,
             agent_graph=agent_graph,
             audit_logger=audit_logger,
         )

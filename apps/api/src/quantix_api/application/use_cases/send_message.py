@@ -28,6 +28,7 @@ from quantix_api.application.interfaces.dataset_storage import DatasetStorage
 from quantix_api.application.use_cases.discover_data_source_schema import (
     DiscoverDataSourceSchemaUseCase,
 )
+from quantix_api.application.use_cases.generate_forecast import GenerateForecastUseCase
 from quantix_api.application.use_cases.sync_dataset import SyncDatasetUseCase
 from quantix_api.domain.entities.agent_run import AgentRun, AgentRunStatus, AgentType
 from quantix_api.domain.entities.audit_log import AuditAction
@@ -62,6 +63,7 @@ class SendMessageUseCase:
         cipher: CredentialCipher,
         sync_dataset_use_case: SyncDatasetUseCase,
         discover_use_case: DiscoverDataSourceSchemaUseCase,
+        generate_forecast_use_case: GenerateForecastUseCase,
         agent_graph: AgentGraph,
         audit_logger: AuditLogger,
         max_iterations: int = 6,
@@ -76,6 +78,7 @@ class SendMessageUseCase:
         self._cipher = cipher
         self._sync_dataset_use_case = sync_dataset_use_case
         self._discover_use_case = discover_use_case
+        self._generate_forecast_use_case = generate_forecast_use_case
         self._agent_graph = agent_graph
         self._audit_logger = audit_logger
         self._max_iterations = max_iterations
@@ -112,6 +115,7 @@ class SendMessageUseCase:
         context = AgentRunContext(
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,
+            conversation_id=conversation_id,
             dataset=dataset,
             dataset_repo=self._dataset_repo,
             dataset_storage=self._dataset_storage,
@@ -120,6 +124,7 @@ class SendMessageUseCase:
             cipher=self._cipher,
             sync_dataset_use_case=self._sync_dataset_use_case,
             discover_use_case=self._discover_use_case,
+            generate_forecast_use_case=self._generate_forecast_use_case,
             max_iterations=self._max_iterations,
         )
         initial_state = AgentState(

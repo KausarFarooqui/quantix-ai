@@ -26,6 +26,7 @@ import numpy as np
 from quantix_api.application.interfaces.agent_graph import AgentRunContext
 from quantix_api.application.interfaces.llm_client import ToolSpec
 from quantix_api.domain.entities.dataset import Dataset
+from quantix_api.domain.exceptions.forecasting import ForecastingError
 
 MAX_QUERY_ROWS = 200
 MAX_PYTHON_SAMPLE_ROWS = 5000
@@ -175,13 +176,20 @@ def _python_tool(context: AgentRunContext) -> ToolHandler:
 def _exec_python(code: str, dataframe: Any) -> str:
     import pandas as pd
 
-    namespace: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS, "pd": pd, "np": np, "df": dataframe}
+    namespace: dict[str, Any] = {
+        "__builtins__": _SAFE_BUILTINS,
+        "pd": pd,
+        "np": np,
+        "df": dataframe,
+    }
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
         exec(code, namespace)  # noqa: S102 — see module docstring: best-effort, not a hard boundary
     printed = stdout.getvalue()
     result = namespace.get("result")
-    parts = [p for p in (printed.strip(), f"result = {result!r}" if result is not None else "") if p]
+    parts = [
+        p for p in (printed.strip(), f"result = {result!r}" if result is not None else "") if p
+    ]
     return "\n".join(parts) or "(no output — assign to `result` or use print())"
 
 
@@ -191,46 +199,52 @@ def _forecast_tool(context: AgentRunContext) -> ToolHandler:
     async def call(arguments: dict[str, Any]) -> str:
         column = arguments.get("column", "")
         periods = int(arguments.get("periods", 5))
+        time_column = arguments.get("time_column") or None
+
         try:
-            table = await anyio.to_thread.run_sync(
-                lambda: context.dataset_storage.read_preview(
-                    storage_uri=dataset.storage_uri, limit=MAX_PYTHON_SAMPLE_ROWS
-                )
+            forecast = await context.generate_forecast_use_case.execute(
+                tenant_id=context.tenant_id,
+                actor_user_id=context.actor_user_id,
+                conversation_id=context.conversation_id,
+                dataset_id=dataset.id,
+                target_column=column,
+                periods=periods,
+                time_column=time_column,
             )
-            series = np.asarray(table.column(column).to_pylist(), dtype=float)
-        except Exception as exc:  # noqa: BLE001
-            return f"Could not read column '{column}': {exc}"
+        except ForecastingError as exc:
+            return str(exc)
+        except Exception as exc:  # noqa: BLE001 — surfaced to the model as a tool result, not raised
+            return f"Could not forecast column '{column}': {exc}"
 
-        if series.size < 2:
-            return f"Column '{column}' has too few numeric points ({series.size}) to forecast."
-
-        # Simple linear-trend extrapolation (least-squares fit over the
-        # row index) — deliberately not a full time-series model
-        # (ARIMA/Prophet); documented as a follow-up in ADR-0004.
-        x = np.arange(series.size)
-        slope, intercept = np.polyfit(x, series, deg=1)
-        future_x = np.arange(series.size, series.size + periods)
-        forecast = (slope * future_x + intercept).tolist()
         return json.dumps(
             {
-                "method": "linear_trend",
-                "historical_points": series.size,
-                "slope_per_period": slope,
-                "forecast": forecast,
+                "forecast_id": str(forecast.id),
+                "method": forecast.method.value,
+                "historical_points": forecast.historical_points,
+                "forecast": [
+                    {"period": p.period, "value": p.value, "lower": p.lower, "upper": p.upper}
+                    for p in forecast.points
+                ],
             }
         )
 
     return ToolHandler(
         spec=ToolSpec(
             name="forecast_series",
-            description="Forecast the next N values of a numeric dataset column using linear "
-            "trend extrapolation. Best for roughly linear trends; says so in its output rather "
-            "than pretending to be a full seasonal model.",
+            description="Forecast the next N values of a numeric dataset column and persist the "
+            "result. Uses Holt-Winters exponential smoothing (with a real prediction interval) "
+            "when there's enough history, falling back to a simpler linear-trend extrapolation "
+            "for short series — the response's 'method' field says which one was actually used.",
             parameters={
                 "type": "object",
                 "properties": {
                     "column": {"type": "string"},
                     "periods": {"type": "integer", "default": 5},
+                    "time_column": {
+                        "type": "string",
+                        "description": "Optional column to sort by first, if the dataset's row "
+                        "order doesn't already reflect chronological order.",
+                    },
                 },
                 "required": ["column"],
             },

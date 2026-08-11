@@ -45,6 +45,7 @@ def _context(*, dataset: Dataset | None = None, storage: FakeDatasetStorage | No
     return AgentRunContext(
         tenant_id=uuid4(),
         actor_user_id=uuid4(),
+        conversation_id=uuid4(),
         dataset=dataset,
         dataset_repo=None,
         dataset_storage=storage or FakeDatasetStorage(),
@@ -53,6 +54,7 @@ def _context(*, dataset: Dataset | None = None, storage: FakeDatasetStorage | No
         cipher=None,
         sync_dataset_use_case=None,
         discover_use_case=None,
+        generate_forecast_use_case=None,
     )
 
 

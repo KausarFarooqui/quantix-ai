@@ -27,6 +27,7 @@ def _context(*, storage: FakeDatasetStorage, dataset: Dataset) -> AgentRunContex
     return AgentRunContext(
         tenant_id=dataset.tenant_id,
         actor_user_id=uuid4(),
+        conversation_id=uuid4(),
         dataset=dataset,
         dataset_repo=None,
         dataset_storage=storage,
@@ -35,6 +36,7 @@ def _context(*, storage: FakeDatasetStorage, dataset: Dataset) -> AgentRunContex
         cipher=None,
         sync_dataset_use_case=None,
         discover_use_case=None,
+        generate_forecast_use_case=None,
     )
 
 
@@ -97,6 +99,7 @@ class TestAutoMLAgentNode:
         context = AgentRunContext(
             tenant_id=uuid4(),
             actor_user_id=uuid4(),
+            conversation_id=uuid4(),
             dataset=None,
             dataset_repo=None,
             dataset_storage=FakeDatasetStorage(),
@@ -105,6 +108,7 @@ class TestAutoMLAgentNode:
             cipher=None,
             sync_dataset_use_case=None,
             discover_use_case=None,
+            generate_forecast_use_case=None,
         )
 
         result = await node.run(state=_state("predict something"), context=context)

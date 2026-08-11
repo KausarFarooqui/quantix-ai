@@ -18,6 +18,7 @@ const NAV_ITEMS: { href: Route; label: string }[] = [
   { href: "/home", label: "Home" },
   { href: "/data-sources", label: "Data sources" },
   { href: "/datasets", label: "Datasets" },
+  { href: "/forecasts", label: "Forecasts" },
   { href: "/chat", label: "Chat" },
 ];
 

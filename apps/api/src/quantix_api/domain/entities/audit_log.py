@@ -35,6 +35,7 @@ class AuditAction(StrEnum):
     CONVERSATION_STARTED = "conversation.started"
     AGENT_TURN_COMPLETED = "agent_turn.completed"
     AGENT_TURN_FAILED = "agent_turn.failed"
+    FORECAST_GENERATED = "forecast.generated"
 
 
 @dataclass(kw_only=True, eq=False)  # see base.Entity docstring — required to inherit identity equality

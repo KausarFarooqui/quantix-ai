@@ -13,6 +13,7 @@ from quantix_api.domain.repositories.audit_log_repository import AuditLogReposit
 from quantix_api.domain.repositories.conversation_repository import ConversationRepository
 from quantix_api.domain.repositories.data_source_repository import DataSourceRepository
 from quantix_api.domain.repositories.dataset_repository import DatasetRepository
+from quantix_api.domain.repositories.forecast_repository import ForecastRepository
 from quantix_api.domain.repositories.message_repository import MessageRepository
 from quantix_api.domain.repositories.oauth_account_repository import OAuthAccountRepository
 from quantix_api.domain.repositories.refresh_token_repository import RefreshTokenRepository
@@ -32,6 +33,9 @@ from quantix_api.infrastructure.database.repositories.data_source_repository imp
 )
 from quantix_api.infrastructure.database.repositories.dataset_repository import (
     SqlAlchemyDatasetRepository,
+)
+from quantix_api.infrastructure.database.repositories.forecast_repository import (
+    SqlAlchemyForecastRepository,
 )
 from quantix_api.infrastructure.database.repositories.message_repository import (
     SqlAlchemyMessageRepository,
@@ -79,6 +83,10 @@ def get_dataset_repository(session: DbSession) -> DatasetRepository:
     return SqlAlchemyDatasetRepository(session)
 
 
+def get_forecast_repository(session: DbSession) -> ForecastRepository:
+    return SqlAlchemyForecastRepository(session)
+
+
 def get_conversation_repository(session: DbSession) -> ConversationRepository:
     return SqlAlchemyConversationRepository(session)
 
@@ -98,6 +106,7 @@ OAuthAccountRepo = Annotated[OAuthAccountRepository, Depends(get_oauth_account_r
 AuditLogRepo = Annotated[AuditLogRepository, Depends(get_audit_log_repository)]
 DataSourceRepo = Annotated[DataSourceRepository, Depends(get_data_source_repository)]
 DatasetRepo = Annotated[DatasetRepository, Depends(get_dataset_repository)]
+ForecastRepo = Annotated[ForecastRepository, Depends(get_forecast_repository)]
 ConversationRepo = Annotated[ConversationRepository, Depends(get_conversation_repository)]
 MessageRepo = Annotated[MessageRepository, Depends(get_message_repository)]
 AgentRunRepo = Annotated[AgentRunRepository, Depends(get_agent_run_repository)]

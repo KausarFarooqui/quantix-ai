@@ -23,6 +23,7 @@ from quantix_api.infrastructure.database.models import (  # noqa: F401
     conversation,
     data_source,
     dataset,
+    forecast,
     message,
     oauth_account,
     refresh_token,

@@ -228,3 +228,39 @@ export interface SendMessageResponse {
   message: MessageResponse;
   agent_runs: AgentRunResponse[];
 }
+
+// --- Forecasts (mirrors apps/api/.../interface/api/v1/schemas/forecasts.py) ---
+
+export type ForecastMethod = "holt_winters" | "linear_trend";
+
+export interface ForecastCreateRequest {
+  dataset_id: string;
+  target_column: string;
+  time_column?: string;
+  periods?: number;
+}
+
+export interface ForecastPointResponse {
+  period: number;
+  value: number;
+  lower: number;
+  upper: number;
+}
+
+/** `points` covers only the forecasted horizon (`period` 1..N steps past
+ * the last historical point) — the historical series itself isn't
+ * returned here, only its count, so a forecast detail view can show the
+ * projection and its interval but not a continuous historical+future
+ * chart without a separate dataset preview call. */
+export interface ForecastResponse {
+  id: string;
+  dataset_id: string;
+  conversation_id: string | null;
+  target_column: string;
+  time_column: string | null;
+  method: ForecastMethod;
+  historical_points: number;
+  points: ForecastPointResponse[];
+  created_at: string;
+}
+

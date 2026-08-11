@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from quantix_api.application.use_cases.discover_data_source_schema import (
         DiscoverDataSourceSchemaUseCase,
     )
+    from quantix_api.application.use_cases.generate_forecast import GenerateForecastUseCase
     from quantix_api.application.use_cases.sync_dataset import SyncDatasetUseCase
     from quantix_api.domain.entities.dataset import Dataset
     from quantix_api.domain.repositories.data_source_repository import DataSourceRepository
@@ -90,6 +91,7 @@ class AgentRunContext:
 
     tenant_id: UUID
     actor_user_id: UUID
+    conversation_id: UUID
     dataset: Dataset | None
     dataset_repo: DatasetRepository
     dataset_storage: DatasetStorage
@@ -98,6 +100,7 @@ class AgentRunContext:
     cipher: CredentialCipher
     sync_dataset_use_case: SyncDatasetUseCase
     discover_use_case: DiscoverDataSourceSchemaUseCase
+    generate_forecast_use_case: GenerateForecastUseCase
     max_iterations: int = 6
 
 

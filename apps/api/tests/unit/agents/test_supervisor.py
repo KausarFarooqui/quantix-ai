@@ -27,6 +27,7 @@ def _context(*, max_iterations: int = 6) -> AgentRunContext:
     return AgentRunContext(
         tenant_id=uuid4(),
         actor_user_id=uuid4(),
+        conversation_id=uuid4(),
         dataset=None,
         dataset_repo=None,
         dataset_storage=FakeDatasetStorage(),
@@ -35,6 +36,7 @@ def _context(*, max_iterations: int = 6) -> AgentRunContext:
         cipher=None,
         sync_dataset_use_case=None,
         discover_use_case=None,
+        generate_forecast_use_case=None,
         max_iterations=max_iterations,
     )
 

@@ -23,6 +23,7 @@ class TestDataIngestionAgentNode:
         context = AgentRunContext(
             tenant_id=uuid4(),
             actor_user_id=uuid4(),
+            conversation_id=uuid4(),
             dataset=None,
             dataset_repo=None,
             dataset_storage=FakeDatasetStorage(),
@@ -31,6 +32,7 @@ class TestDataIngestionAgentNode:
             cipher=None,
             sync_dataset_use_case=FakeSyncDatasetUseCase(),
             discover_use_case=None,
+            generate_forecast_use_case=None,
         )
         node = DataIngestionAgentNode()
 
@@ -55,6 +57,7 @@ class TestDataIngestionAgentNode:
         context = AgentRunContext(
             tenant_id=dataset.tenant_id,
             actor_user_id=actor_id,
+            conversation_id=uuid4(),
             dataset=dataset,
             dataset_repo=None,
             dataset_storage=FakeDatasetStorage(),
@@ -63,6 +66,7 @@ class TestDataIngestionAgentNode:
             cipher=None,
             sync_dataset_use_case=sync_use_case,
             discover_use_case=None,
+            generate_forecast_use_case=None,
         )
         node = DataIngestionAgentNode()
 
@@ -80,6 +84,7 @@ class TestDataIngestionAgentNode:
         context = AgentRunContext(
             tenant_id=dataset.tenant_id,
             actor_user_id=uuid4(),
+            conversation_id=uuid4(),
             dataset=dataset,
             dataset_repo=None,
             dataset_storage=FakeDatasetStorage(),
@@ -88,6 +93,7 @@ class TestDataIngestionAgentNode:
             cipher=None,
             sync_dataset_use_case=sync_use_case,
             discover_use_case=None,
+            generate_forecast_use_case=None,
         )
         node = DataIngestionAgentNode()
 

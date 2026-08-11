@@ -15,6 +15,9 @@ from quantix_api.interface.api.v1.dependencies.connector_use_cases import (
     DiscoverDataSourceSchemaUseCaseDep,
     SyncDatasetUseCaseDep,
 )
+from quantix_api.interface.api.v1.dependencies.forecast_use_cases import (
+    GenerateForecastUseCaseDep,
+)
 from quantix_api.interface.api.v1.dependencies.repositories import (
     AgentRunRepo,
     ConversationRepo,
@@ -50,6 +53,7 @@ def get_send_message_use_case(
     cipher: CredentialCipherDep,
     sync_dataset_use_case: SyncDatasetUseCaseDep,
     discover_use_case: DiscoverDataSourceSchemaUseCaseDep,
+    generate_forecast_use_case: GenerateForecastUseCaseDep,
     agent_graph: AgentGraphDep,
     audit_logger: AuditLoggerDep,
 ) -> SendMessageUseCase:
@@ -65,6 +69,7 @@ def get_send_message_use_case(
         cipher=cipher,
         sync_dataset_use_case=sync_dataset_use_case,
         discover_use_case=discover_use_case,
+        generate_forecast_use_case=generate_forecast_use_case,
         agent_graph=agent_graph,
         audit_logger=audit_logger,
         max_iterations=settings.agent_max_supervisor_iterations,

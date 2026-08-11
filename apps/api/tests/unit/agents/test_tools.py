@@ -6,25 +6,50 @@ import json
 from uuid import uuid4
 
 import pyarrow as pa
-from _agent_fakes import FakeDatasetStorage
+from _agent_fakes import (
+    FakeAuditLogger,
+    FakeDatasetRepository,
+    FakeDatasetStorage,
+    FakeForecastRepository,
+)
 
 from quantix_api.application.interfaces.agent_graph import AgentRunContext
-from quantix_api.domain.entities.dataset import Dataset, DatasetColumn, DatasetColumnType
+from quantix_api.application.use_cases.generate_forecast import GenerateForecastUseCase
+from quantix_api.domain.entities.dataset import (
+    Dataset,
+    DatasetColumn,
+    DatasetColumnType,
+    DatasetStatus,
+)
 from quantix_api.infrastructure.agents.tools import build_dataset_tools
 
 
-def _context(*, dataset: Dataset | None, storage: FakeDatasetStorage | None = None) -> AgentRunContext:
+def _context(
+    *, dataset: Dataset | None, storage: FakeDatasetStorage | None = None
+) -> AgentRunContext:
+    resolved_storage = storage or FakeDatasetStorage()
+    tenant_id = dataset.tenant_id if dataset is not None else uuid4()
+    dataset_repo = FakeDatasetRepository(
+        datasets={dataset.id: dataset} if dataset is not None else {}
+    )
     return AgentRunContext(
-        tenant_id=uuid4(),
+        tenant_id=tenant_id,
         actor_user_id=uuid4(),
+        conversation_id=uuid4(),
         dataset=dataset,
         dataset_repo=None,
-        dataset_storage=storage or FakeDatasetStorage(),
+        dataset_storage=resolved_storage,
         data_source_repo=None,
         connector_factory=None,
         cipher=None,
         sync_dataset_use_case=None,
         discover_use_case=None,
+        generate_forecast_use_case=GenerateForecastUseCase(
+            dataset_repo=dataset_repo,
+            dataset_storage=resolved_storage,
+            forecast_repo=FakeForecastRepository(),
+            audit_logger=FakeAuditLogger(),
+        ),
     )
 
 
@@ -35,6 +60,7 @@ def _dataset(*, storage_uri: str | None) -> Dataset:
         name="orders",
         table_identifier="orders",
         storage_uri=storage_uri,
+        status=DatasetStatus.READY if storage_uri is not None else DatasetStatus.PENDING,
         schema=[
             DatasetColumn(name="id", data_type=DatasetColumnType.INTEGER),
             DatasetColumn(name="amount", data_type=DatasetColumnType.FLOAT),
@@ -134,7 +160,7 @@ class TestPythonTool:
 
 
 class TestForecastTool:
-    async def test_linear_trend_forecast(self) -> None:
+    async def test_short_series_falls_back_to_linear_trend_and_persists(self) -> None:
         storage = FakeDatasetStorage()
         storage.put("uri", pa.table({"value": [10.0, 20.0, 30.0, 40.0]}))
         dataset = _dataset(storage_uri="uri")
@@ -144,10 +170,32 @@ class TestForecastTool:
         result = json.loads(await forecast_tool.call({"column": "value", "periods": 2}))
 
         assert result["method"] == "linear_trend"
+        assert result["historical_points"] == 4
+        assert result["forecast_id"]
         assert len(result["forecast"]) == 2
         # Trend is +10/period, so the next two points should continue upward.
-        assert result["forecast"][0] > 40
-        assert result["forecast"][1] > result["forecast"][0]
+        assert result["forecast"][0]["value"] > 40
+        assert result["forecast"][1]["value"] > result["forecast"][0]["value"]
+        # A real (if heuristic) interval, not just a bare point forecast.
+        assert (
+            result["forecast"][0]["lower"]
+            <= result["forecast"][0]["value"]
+            <= result["forecast"][0]["upper"]
+        )
+
+    async def test_long_series_uses_holt_winters(self) -> None:
+        storage = FakeDatasetStorage()
+        values = [float(50 + 2 * i) for i in range(20)]
+        storage.put("uri", pa.table({"value": values}))
+        dataset = _dataset(storage_uri="uri")
+        tools = build_dataset_tools(_context(dataset=dataset, storage=storage))
+        forecast_tool = next(t for t in tools if t.spec.name == "forecast_series")
+
+        result = json.loads(await forecast_tool.call({"column": "value", "periods": 3}))
+
+        assert result["method"] == "holt_winters"
+        assert len(result["forecast"]) == 3
+        assert result["forecast"][0]["lower"] < result["forecast"][0]["upper"]
 
     async def test_too_few_points_is_reported_not_raised(self) -> None:
         storage = FakeDatasetStorage()
@@ -158,4 +206,15 @@ class TestForecastTool:
 
         result = await forecast_tool.call({"column": "value", "periods": 2})
 
-        assert "too few" in result
+        assert "at least" in result
+
+    async def test_unknown_column_is_reported_not_raised(self) -> None:
+        storage = FakeDatasetStorage()
+        storage.put("uri", pa.table({"value": [10.0, 20.0, 30.0]}))
+        dataset = _dataset(storage_uri="uri")
+        tools = build_dataset_tools(_context(dataset=dataset, storage=storage))
+        forecast_tool = next(t for t in tools if t.spec.name == "forecast_series")
+
+        result = await forecast_tool.call({"column": "does_not_exist", "periods": 2})
+
+        assert "was not found" in result

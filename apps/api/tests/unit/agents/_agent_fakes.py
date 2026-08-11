@@ -17,6 +17,8 @@ from quantix_api.application.interfaces.agent_graph import AgentState
 from quantix_api.application.interfaces.llm_client import LLMResponse
 from quantix_api.domain.entities.agent_run import AgentRun
 from quantix_api.domain.entities.conversation import Conversation
+from quantix_api.domain.entities.dataset import Dataset
+from quantix_api.domain.entities.forecast import Forecast
 from quantix_api.domain.entities.message import Message
 from quantix_api.domain.exceptions.base import EntityNotFoundError
 
@@ -176,3 +178,56 @@ class FakeAuditLogger:
 
     async def record(self, **kwargs: Any) -> None:
         self.records.append(kwargs)
+
+
+class FakeDatasetRepository:
+    """Minimal enough for ``GenerateForecastUseCase`` to look datasets up
+    by id — not a full repository fake, since nothing here exercises
+    ``list_for_tenant``/``list_for_data_source``.
+    """
+
+    def __init__(self, *, datasets: dict[UUID, Dataset] | None = None) -> None:
+        self.store: dict[UUID, Dataset] = dict(datasets or {})
+
+    async def get_by_id(self, entity_id: UUID) -> Dataset | None:
+        return self.store.get(entity_id)
+
+    async def add(self, entity: Dataset) -> Dataset:
+        self.store[entity.id] = entity
+        return entity
+
+    async def update(self, entity: Dataset) -> Dataset:
+        if entity.id not in self.store:
+            raise EntityNotFoundError("Dataset", entity.id)
+        self.store[entity.id] = entity
+        return entity
+
+    async def delete(self, entity_id: UUID) -> None:
+        self.store.pop(entity_id, None)
+
+
+class FakeForecastRepository:
+    def __init__(self) -> None:
+        self.store: dict[UUID, Forecast] = {}
+
+    async def get_by_id(self, entity_id: UUID) -> Forecast | None:
+        return self.store.get(entity_id)
+
+    async def add(self, entity: Forecast) -> Forecast:
+        self.store[entity.id] = entity
+        return entity
+
+    async def update(self, entity: Forecast) -> Forecast:
+        if entity.id not in self.store:
+            raise EntityNotFoundError("Forecast", entity.id)
+        self.store[entity.id] = entity
+        return entity
+
+    async def delete(self, entity_id: UUID) -> None:
+        self.store.pop(entity_id, None)
+
+    async def list_for_dataset(self, dataset_id: UUID) -> list[Forecast]:
+        return [f for f in self.store.values() if f.dataset_id == dataset_id]
+
+    async def list_for_tenant(self, tenant_id: UUID) -> list[Forecast]:
+        return [f for f in self.store.values() if f.tenant_id == tenant_id]
